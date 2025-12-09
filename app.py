@@ -4,6 +4,7 @@ from openai import OpenAI
 import uuid
 from geopy.geocoders import Nominatim
 import city_data
+from datetime import date # 👈 【新增】引入日期库
 
 # ==========================================
 # 0. 页面配置 & 隐藏菜单
@@ -55,7 +56,7 @@ def get_coordinates(city_name):
         return city_data.CHINA_CITIES[clean_name]
 
     try:
-        geolocator = Nominatim(user_agent="my_hd_app_v12_smooth", timeout=5)
+        geolocator = Nominatim(user_agent="my_hd_app_v13_datefix", timeout=5)
         location = geolocator.geocode(city_name)
         if location:
             return location.latitude, location.longitude
@@ -77,23 +78,32 @@ if "system_prompt_content" not in st.session_state:
     st.session_state.system_prompt_content = ""
 
 # ==========================================
-# 4. 网页界面布局 (优化顺序：标题 -> 历史 -> 输入 -> 新消息)
+# 4. 网页界面布局
 # ==========================================
 st.title("🔮 天命人类图AI+")
 
-# --- A. 先展示历史聊天记录 (Old Messages) ---
-# 这样保证了历史记录永远在最上面
+# --- A. 先展示历史聊天记录 ---
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- B. 输入区域 (Expander) ---
-# 优化：expanded=True 让它默认展开，且不会因为 rerun 自动关闭
+# --- B. 输入区域 ---
 with st.expander("📝 输入/修改 出生信息", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         name = st.text_input("你的名字", "Wanye")
-        birth_date = st.date_input("出生日期")
+        
+        # 👈 【修改点】设置日期范围
+        # min_value: 允许最早选到 1900年
+        # max_value: 最晚选到今天
+        # value: 默认显示 1995年 (方便用户调节)
+        birth_date = st.date_input(
+            "出生日期", 
+            value=date(1995, 1, 1), 
+            min_value=date(1900, 1, 1), 
+            max_value=date.today()
+        )
+        
     with col2:
         city = st.text_input("出生城市 (中文/拼音)", "北京")
         birth_time = st.time_input("出生时间")
@@ -146,14 +156,13 @@ with st.expander("📝 输入/修改 出生信息", expanded=True):
             # 4. 更新状态
             st.session_state.chart_calculated = True
             st.session_state.current_chart = chart_data
-            st.session_state.messages = [] # 清空旧历史
+            st.session_state.messages = [] 
 
-            # 5. 主动触发第一次 AI 解读 (隐藏指令)
+            # 5. 主动触发第一次 AI 解读
             first_trigger_msg = [{"role": "system", "content": st.session_state.system_prompt_content}, 
                                  {"role": "user", "content": "请基于我的数据，给我一份完整、深度的整体解读报告。"}]
             
-            # --- C. 处理新生成的流式消息 (New Message) ---
-            # 重点：我们在按钮内部直接渲染这个新消息，而不需要 rerun
+            # --- C. 处理新生成的流式消息 ---
             with st.chat_message("assistant"):
                 response_placeholder = st.empty()
                 full_response = ""
@@ -168,13 +177,9 @@ with st.expander("📝 输入/修改 出生信息", expanded=True):
                             response_placeholder.markdown(full_response + "▌")
                     
                     response_placeholder.markdown(full_response)
-                    
-                    # 关键修改：只存入历史，不刷新页面
-                    # 这样屏幕上显示的是：[历史(空)] -> [输入框] -> [新生成的回复]
-                    # 下次用户发消息刷新时，这个回复就会跑到上面的 [历史] 里去了，完美衔接
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-# --- 结果展示区 (常驻显示盘面信息) ---
+# --- 结果展示区 ---
 if st.session_state.chart_calculated:
     d = st.session_state.current_chart
     loc_str = ""
@@ -185,17 +190,14 @@ if st.session_state.chart_calculated:
 
 # --- D. 聊天输入框 ---
 if prompt := st.chat_input("和活活继续深入探讨..."):
-    # 1. 渲染用户的新问题
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 2. 准备上下文
     api_messages = [{"role": "system", "content": st.session_state.system_prompt_content}]
     for msg in st.session_state.messages:
         api_messages.append(msg)
 
-    # 3. 渲染 AI 的回复
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         full_response = ""
