@@ -1,0 +1,13 @@
+[client]
+# 将工具栏模式设置为 "viewer" (观看者模式)
+# 这会隐藏开发调试按钮，只保留最基础的查看功能
+# 配合你在 app.py 里的 CSS，能达到完美的隐藏效果
+toolbarMode = "viewer"
+
+# 隐藏加载时的报错细节（让加载更干净）
+showErrorDetails = false
+
+[theme]
+# (可选) 你可以在这里固定主题颜色，防止加载时颜色跳变
+base = "dark"
+primaryColor = "#FF4B4B"

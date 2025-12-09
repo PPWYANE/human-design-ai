@@ -1,14 +1,14 @@
 import streamlit as st
-import calculation  # 引用同目录下的 calculation.py
+import calculation
 from openai import OpenAI
 import uuid
 from geopy.geocoders import Nominatim
-import city_data  # 引用同目录下的 city_data.py
+import city_data
 
 # ==========================================
 # 0. 页面配置 & 隐藏菜单
 # ==========================================
-st.set_page_config(page_title="人类图 AI 咨询室", page_icon="🔮")
+st.set_page_config(page_title="天命人类图AI+", page_icon="🔮")
 
 hide_streamlit_style = """
 <style>
@@ -23,13 +23,11 @@ st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 # 1. 配置 DeepSeek API
 # ==========================================
 try:
-    # 从 Streamlit Secrets 读取 API Key
     api_key = st.secrets["DEEPSEEK_API_KEY"]
 except (FileNotFoundError, KeyError):
     st.warning("⚠️ 未检测到密钥配置，请在 .streamlit/secrets.toml 中配置 DEEPSEEK_API_KEY")
     st.stop()
 
-# 初始化 OpenAI 客户端 (适配 DeepSeek)
 client = OpenAI(
     api_key=api_key,
     base_url="https://api.deepseek.com"
@@ -39,13 +37,12 @@ client = OpenAI(
 # 2. 定义功能函数
 # ==========================================
 def chat_with_deepseek(messages):
-    """发送对话给 DeepSeek"""
     try:
         response = client.chat.completions.create(
             model="deepseek-chat", 
             messages=messages,
             stream=True,
-            temperature=1.3  # 较高的温度让解读更灵动
+            temperature=1.3 
         )
         return response
     except Exception as e:
@@ -53,20 +50,16 @@ def chat_with_deepseek(messages):
         return None
 
 def get_coordinates(city_name):
-    """
-    优先查本地 city_data，查不到再去联网，彻底解决云端报错
-    """
-    # 1. 预处理：去空格，转小写
+    # 1. 预处理
     clean_name = city_name.strip().lower()
 
-    # 2. 策略A：查询本地离线库 (极速、稳定)
+    # 2. 查本地库
     if clean_name in city_data.CHINA_CITIES:
         return city_data.CHINA_CITIES[clean_name]
 
-    # 3. 策略B：尝试联网查询 (兜底)
+    # 3. 查网络 (兜底)
     try:
-        # timeout 设置为 5 秒，防止卡死
-        geolocator = Nominatim(user_agent="my_hd_app_v9_offline_first", timeout=5)
+        geolocator = Nominatim(user_agent="my_hd_app_v11_guide_mode", timeout=5)
         location = geolocator.geocode(city_name)
         if location:
             return location.latitude, location.longitude
@@ -90,7 +83,7 @@ if "system_prompt_content" not in st.session_state:
 # ==========================================
 # 4. 网页界面布局
 # ==========================================
-st.title("🔮 天命人类图 AI 咨询室")
+st.title("🔮 天命人类图AI+")
 
 # --- 输入区域 ---
 with st.expander("📝 输入/修改 出生信息", expanded=not st.session_state.chart_calculated):
@@ -99,11 +92,9 @@ with st.expander("📝 输入/修改 出生信息", expanded=not st.session_stat
         name = st.text_input("你的名字", "Wanye")
         birth_date = st.date_input("出生日期")
     with col2:
-        # 提示用户支持中文和拼音
         city = st.text_input("出生城市 (中文/拼音)", "北京")
         birth_time = st.time_input("出生时间")
 
-    # 点击按钮触发逻辑
     if st.button("🚀 生成盘面并深度解读", type="primary"):
         with st.spinner('正在连接宇宙能量库，生成深度报告...'):
             # 1. 获取经纬度
@@ -115,28 +106,32 @@ with st.expander("📝 输入/修改 出生信息", expanded=not st.session_stat
             # 2. 计算人类图
             chart_data = calculation.get_chart_data(birth_date, birth_time, lat, lon)
 
-            # 3. 构建 System Prompt (注入灵魂)
+            # 3. 构建 System Prompt (本次核心修改：加入强引导逻辑)
             st.session_state.system_prompt_content = f"""
 # 角色 (Role)
 你叫“活活 (Huohuo)”，一位资深且温暖的人类图分析师。
 你的特长是将冰冷的参数转化为直击灵魂的生命故事。
 
-# 任务 (Task)
-你的首要任务是基于用户的出生数据，**主动输出**一份结构完整、深度的人类图解读报告。
+# 核心指令 (Core Instruction)
+**你必须掌握对话的主动权。**
+在每次回复的最后，**必须**抛出一个具有引导性的**反问句**，诱导用户继续深入探索，绝不让对话在你的回合结束（把天聊死）。
 
 # 回复逻辑 (Workflow)
-## 第一阶段：深度首秀 (The Grand Opening)
-**当对话开始时**，请忽略常规寒暄，直接输出一份 **600字左右** 的综合解读，包含：
-1.  **能量致意**：呼唤名字，连接 {city} 的出生地能量场。
-2.  **核心画像（类型+人生角色）**：
-    * 不要分开解释术语。请用比喻将两者结合。
-    * 例如：如果是“生产者 + 5/1”，可以描述为“一位自带核动力马达的幕后问题解决专家”。
-3.  **光之天赋（意识太阳）**：解析【意识太阳闸门】，这是他今生最耀眼的力量。
-4.  **暗之动力（潜意识太阳）**：点出【潜意识太阳闸门】，内在不为人知的驱动力。
-5.  **灵魂拷问**：抛出一个深度的反思问题。
 
-## 第二阶段：后续互动
-* 后续回复请保持在 **300字以内**，短小精悍。
+## 第一阶段：深度首秀 (The Grand Opening)
+**当对话开始时**，直接输出一份 **600字左右** 的综合解读，包含：
+1.  **能量致意**：呼唤名字，连接 {city} 的出生地能量场。
+2.  **核心画像（类型+人生角色）**：用比喻将两者结合（如“核动力马达 + 幕后专家”）。
+3.  **光之天赋（意识太阳）**：解析【意识太阳闸门】的最强天赋。
+4.  **暗之动力（潜意识太阳）**：点出内在驱动力。
+5.  **灵魂拷问**：(关键) 基于以上分析，抛出一个直击痛点的反思问题，开启后续对话。
+
+## 第二阶段：后续互动 (Deep Dive)
+* **篇幅限制**：保持在 300 字以内，短小精悍。
+* **追问机制 (必须执行)**：
+    * 解读完用户的疑问后，不要只给结论。
+    * 要结合他的【闸门】或【类型】，问他生活中的具体场景。
+    * *话术示范*：“这股能量在你的工作中，是不是经常让你感觉到...？” 或者 “回顾你的亲密关系，你是否发现自己总是倾向于...？”
 
 ---
 # 用户实时数据
@@ -152,13 +147,12 @@ with st.expander("📝 输入/修改 出生信息", expanded=not st.session_stat
             # 4. 更新状态
             st.session_state.chart_calculated = True
             st.session_state.current_chart = chart_data
-            st.session_state.messages = [] # 清空旧历史
+            st.session_state.messages = [] 
 
-            # 5. 主动触发第一次 AI 解读 (隐藏指令)
+            # 5. 主动触发第一次 AI 解读
             first_trigger_msg = [{"role": "system", "content": st.session_state.system_prompt_content}, 
                                  {"role": "user", "content": "请基于我的数据，给我一份完整、深度的整体解读报告。"}]
             
-            # 6. 流式输出 AI 的第一篇长文
             with st.chat_message("assistant"):
                 response_placeholder = st.empty()
                 full_response = ""
@@ -173,17 +167,13 @@ with st.expander("📝 输入/修改 出生信息", expanded=not st.session_stat
                             response_placeholder.markdown(full_response + "▌")
                     
                     response_placeholder.markdown(full_response)
-                    
-                    # 7. 存入历史
                     st.session_state.messages.append({"role": "assistant", "content": full_response})
             
-            # 8. 强制刷新页面 (解决回复显示两次的问题)
             st.rerun()
 
 # --- 结果展示区 ---
 if st.session_state.chart_calculated:
     d = st.session_state.current_chart
-    # 如果经纬度存在，显示坐标
     loc_str = ""
     if d.get('location') and d['location'].get('lat'):
          loc_str = f"📍 {d['location']['lat']:.2f}, {d['location']['lon']:.2f}"
@@ -196,18 +186,15 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # --- 聊天输入框 ---
-if prompt := st.chat_input("针对刚才的解读，你有什么想问的？"):
-    # 1. 显示用户输入
+if prompt := st.chat_input("和活活继续深入探讨..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 2. 准备发送消息列表 (System + History)
     api_messages = [{"role": "system", "content": st.session_state.system_prompt_content}]
     for msg in st.session_state.messages:
         api_messages.append(msg)
 
-    # 3. 请求 DeepSeek
     with st.chat_message("assistant"):
         response_placeholder = st.empty()
         full_response = ""
@@ -222,5 +209,4 @@ if prompt := st.chat_input("针对刚才的解读，你有什么想问的？"):
                     response_placeholder.markdown(full_response + "▌")
             
             response_placeholder.markdown(full_response)
-            
             st.session_state.messages.append({"role": "assistant", "content": full_response})
