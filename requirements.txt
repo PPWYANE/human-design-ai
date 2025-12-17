@@ -3,3 +3,4 @@ ephem
 requests
 geopy
 openai
+Pillow
